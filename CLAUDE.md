@@ -65,6 +65,12 @@ Shared test helpers live in `tests/common/mod.rs` and include:
 
 E2E tests gracefully skip if the demo binary isn't built.
 
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) - Version history and notable changes
+
+**Changelog updates required**: Any user-facing changes (new features, behavior changes, bug fixes) must be documented in CHANGELOG.md before merging. Internal refactors and CI changes don't need entries.
+
 ## Conventions
 
 - Rust 2024 edition, MSRV 1.88
