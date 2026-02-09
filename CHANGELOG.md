@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Width-aware text wrapping**: `TextBuffer` now wraps text to the terminal width (auto-detected at each `flush()` call). Use `TextBuffer::with_width(n)` for a fixed width. Adapts to terminal resizes automatically.
+
 ## [0.1.0] - 2025-02-01
 
 Initial release.

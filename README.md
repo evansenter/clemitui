@@ -38,6 +38,7 @@ Buffer streaming text chunks and render with markdown formatting on flush:
 ```rust
 use clemitui::TextBuffer;
 
+// Auto-detects terminal width at each flush (adapts to resizes)
 let mut buffer = TextBuffer::new();
 buffer.push("Here's the **fix**:\n\n");
 buffer.push("```rust\nfn main() {}\n```");
@@ -45,6 +46,10 @@ buffer.push("```rust\nfn main() {}\n```");
 if let Some(rendered) = buffer.flush() {
     print!("{}", rendered);
 }
+
+// Or use a fixed width
+let mut fixed = TextBuffer::with_width(80);
+fixed.push("Text wrapped to exactly 80 columns.");
 ```
 
 ### Logging infrastructure

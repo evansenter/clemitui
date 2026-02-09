@@ -552,6 +552,114 @@ fn test_tool_args_edit_filtering() {
 }
 
 // =============================================================================
+// Width-Aware Wrapping E2E Tests
+// =============================================================================
+
+#[test]
+fn test_text_buffer_wrapped_default() {
+    if !has_demo_binary() {
+        eprintln!("Skipping: demo binary not found");
+        return;
+    }
+
+    let mut session = spawn_demo(&["text-buffer-wrapped"]).expect("Failed to spawn");
+
+    let output = read_until_eof(&mut session);
+    let stripped = strip_ansi(&output);
+
+    // Should contain the default demo text content
+    assert!(
+        stripped.contains("quick brown fox"),
+        "Should contain demo text: {}",
+        stripped
+    );
+    assert!(
+        stripped.contains("Hello, world!"),
+        "Should contain code block: {}",
+        stripped
+    );
+    assert!(
+        stripped.contains("First item"),
+        "Should contain list: {}",
+        stripped
+    );
+}
+
+#[test]
+fn test_text_buffer_wrapped_narrow() {
+    if !has_demo_binary() {
+        eprintln!("Skipping: demo binary not found");
+        return;
+    }
+
+    // Render at 40 columns
+    let mut session = spawn_demo(&["text-buffer-wrapped", "40"]).expect("Failed to spawn");
+
+    let output = read_until_eof(&mut session);
+    let stripped = strip_ansi(&output);
+
+    // Content should be preserved
+    assert!(
+        stripped.contains("quick brown fox"),
+        "Content should be preserved at narrow width: {}",
+        stripped
+    );
+
+    // Should have more lines than wide rendering (text wraps)
+    let narrow_lines = stripped.lines().filter(|l| !l.trim().is_empty()).count();
+
+    // Now render at 200 columns
+    let mut session_wide = spawn_demo(&["text-buffer-wrapped", "200"]).expect("Failed to spawn");
+    let output_wide = read_until_eof(&mut session_wide);
+    let stripped_wide = strip_ansi(&output_wide);
+    let wide_lines = stripped_wide
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .count();
+
+    assert!(
+        narrow_lines > wide_lines,
+        "Narrow (40 cols, {} lines) should have more lines than wide (200 cols, {} lines)",
+        narrow_lines,
+        wide_lines
+    );
+}
+
+#[test]
+fn test_text_buffer_wrapped_custom_text() {
+    if !has_demo_binary() {
+        eprintln!("Skipping: demo binary not found");
+        return;
+    }
+
+    let mut session = spawn_demo(&[
+        "text-buffer-wrapped",
+        "50",
+        "Custom **bold** text for testing width-aware wrapping at exactly fifty columns.",
+    ])
+    .expect("Failed to spawn");
+
+    let output = read_until_eof(&mut session);
+    let stripped = strip_ansi(&output);
+
+    assert!(
+        stripped.contains("Custom"),
+        "Should contain custom text: {}",
+        stripped
+    );
+    assert!(
+        stripped.contains("bold"),
+        "Should contain bold text: {}",
+        stripped
+    );
+    assert!(
+        stripped.contains("fifty columns"),
+        "Should contain full text: {}",
+        stripped
+    );
+}
+
+// =============================================================================
 // ANSI Color Tests (verify colors are actually present)
 // =============================================================================
 

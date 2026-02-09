@@ -1636,6 +1636,146 @@ fn test_output_sink_logging() {
     );
 }
 
+// =============================================================================
+// Width-Aware Rendering Tests
+// =============================================================================
+
+/// Simulates streaming markdown rendered at a constrained width.
+#[test]
+fn test_width_constrained_streaming() {
+    let mut buffer = TextBuffer::with_width(50);
+
+    buffer.push("# Analysis Results\n\n");
+    buffer.push(
+        "The codebase has the following issues that need to be addressed before release:\n\n",
+    );
+    buffer.push("1. **Memory leak** in the connection pool handler that occurs under heavy load\n");
+    buffer.push("2. **Race condition** in the session cleanup routine\n");
+    buffer.push("3. Missing error handling in the file upload path\n\n");
+    buffer.push("```rust\nfn fix_connection_pool() {\n    pool.drain().await;\n}\n```\n");
+
+    let rendered = buffer.flush();
+    assert!(rendered.is_some(), "Should have rendered content");
+
+    let content = strip_ansi(&rendered.unwrap());
+
+    // Content should be preserved
+    assert!(content.contains("Analysis Results"), "Should have title");
+    assert!(content.contains("Memory leak"), "Should have first issue");
+    assert!(
+        content.contains("Race condition"),
+        "Should have second issue"
+    );
+    assert!(content.contains("fix_connection_pool"), "Should have code");
+
+    // Lines should respect width (non-code lines)
+    for line in content.lines() {
+        // Code blocks and headers may have ANSI-stripped artifacts but
+        // regular text lines should be wrapped
+        if !line.trim().is_empty()
+            && !line.contains("fix_connection_pool")
+            && !line.contains("pool.drain")
+            && !line.contains("```")
+        {
+            assert!(
+                line.len() <= 55, // Allow small overflow for termimad padding
+                "Line should be close to width 50 ({} chars): {:?}",
+                line.len(),
+                line
+            );
+        }
+    }
+}
+
+/// Verifies width-aware rendering produces different output at different widths.
+#[test]
+fn test_width_comparison_in_simulation() {
+    let text = "The quick brown fox jumps over the lazy dog. This sentence has enough words to demonstrate how text wrapping works at different terminal widths. It should produce more lines at narrow widths and fewer lines at wide widths.";
+
+    let mut narrow = TextBuffer::with_width(40);
+    narrow.push(text);
+    let narrow_out = strip_ansi(&narrow.flush().unwrap());
+
+    let mut wide = TextBuffer::with_width(120);
+    wide.push(text);
+    let wide_out = strip_ansi(&wide.flush().unwrap());
+
+    let narrow_lines = narrow_out.lines().count();
+    let wide_lines = wide_out.lines().count();
+
+    assert!(
+        narrow_lines > wide_lines,
+        "Narrow ({} lines) should have more lines than wide ({} lines)",
+        narrow_lines,
+        wide_lines,
+    );
+
+    // Both should preserve the full content
+    let narrow_joined = narrow_out
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let wide_joined = wide_out
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    assert!(
+        narrow_joined.contains("quick brown fox"),
+        "Narrow should preserve content"
+    );
+    assert!(
+        wide_joined.contains("quick brown fox"),
+        "Wide should preserve content"
+    );
+}
+
+/// Simulates an agent that renders tool explanations at a specific width.
+#[test]
+fn test_interleaved_width_constrained_output() {
+    let _guard = DisableColors::new();
+
+    let mut buffer = TextBuffer::with_width(60);
+    let mut output = String::new();
+
+    // Agent explains at constrained width
+    buffer.push("I'll search for all TODO comments in the source code and fix any that have been resolved but not cleaned up.\n\n");
+    flush_to_output(&mut buffer, &mut output);
+
+    // Tool execution (not width-constrained - tool formatting is fixed)
+    let args = json!({"pattern": "TODO", "path": "src/"});
+    output.push_str(&strip_ansi(&format_tool_executing("grep", &args)));
+    output.push_str(&strip_ansi(&format_tool_result(
+        "grep",
+        Duration::from_millis(25),
+        80,
+        false,
+    )));
+    output.push('\n');
+
+    // Agent reports results at constrained width
+    buffer.push("Found 5 TODO comments. Three have been resolved and can be removed. The remaining two are legitimate work items.\n\n");
+    flush_to_output(&mut buffer, &mut output);
+
+    // Verify content preserved
+    assert!(output.contains("TODO"), "Should mention TODO");
+    assert!(output.contains("grep"), "Should have grep tool");
+    assert!(output.contains("5 TODO"), "Should report count");
+
+    // Verify the explanation text was wrapped (it's > 60 chars)
+    let explanation_lines: Vec<&str> = output
+        .lines()
+        .filter(|l| l.contains("search for all TODO"))
+        .collect();
+    // If wrapped, the full sentence won't appear on a single line
+    assert!(
+        explanation_lines.is_empty() || explanation_lines[0].len() <= 65,
+        "Explanation should be wrapped to ~60 cols"
+    );
+}
+
 /// Test that logging can be disabled.
 #[test]
 fn test_logging_disabled() {
