@@ -41,6 +41,7 @@ fn main() {
         eprintln!("  error-detail <message>");
         eprintln!("  error-message <message>");
         eprintln!("  retry <attempt> <max> <reason>");
+        eprintln!("  text-buffer-wrapped [width] [text]");
         eprintln!("  ctrl-c");
         eprintln!("  cancelled");
         eprintln!("  logging");
@@ -183,6 +184,19 @@ fn main() {
             buffer.push("streaming text.");
             if let Some(rendered) = buffer.flush() {
                 println!("{}", rendered);
+            }
+        }
+
+        "text-buffer-wrapped" => {
+            // Demonstrate width-aware text wrapping
+            let width: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(60);
+            let text = args.get(3).map(|s| s.as_str()).unwrap_or(
+                "The quick brown fox jumps over the lazy dog. This sentence has enough words to demonstrate how text wrapping works at different terminal widths. **Bold text** and *italic text* are preserved through wrapping. Here is a code example:\n\n```rust\nfn main() {\n    println!(\"Hello, world!\");\n}\n```\n\nAnd a list:\n\n- First item with some extra descriptive text\n- Second item\n- Third item with even more text to show wrapping behavior",
+            );
+            let mut buffer = TextBuffer::with_width(width);
+            buffer.push(text);
+            if let Some(rendered) = buffer.flush() {
+                print!("{}", rendered);
             }
         }
 
